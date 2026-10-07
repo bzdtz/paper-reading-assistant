@@ -240,3 +240,10 @@ npm run test
 
 - 前端请求失败：
   - 确认后端是否运行在 `3000` 端口，或更新 `frontend/.env` 中 `VUE_APP_API_BASE_URL`。
+
+## 8. 许可
+
+本项目采用 [MIT License](./LICENSE)。可以自由使用、修改和分发。
+
+注意：`backend/.env`、`backend/.z-ai-config`、`backend/prisma/dev.db` 与上传文件目录均在
+`.gitignore` 中，不会进入仓库——请把 MinerU token 和 AI 网关密钥只写在自己的本机配置里。
