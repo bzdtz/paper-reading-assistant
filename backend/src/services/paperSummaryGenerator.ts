@@ -173,29 +173,41 @@ export class PaperSummaryGenerator {
       data: { summaryStatus: "generating", summaryError: null }
     });
 
-    const aiRaw = await this.aiClient.chat([
-      { role: "system", content: SUMMARY_SYSTEM_PROMPT },
-      { role: "user", content: `请为以下论文生成结构化导读：\n\n${corpus}` }
-    ]);
+    try {
+      const aiRaw = await this.aiClient.chat([
+        { role: "system", content: SUMMARY_SYSTEM_PROMPT },
+        { role: "user", content: `请为以下论文生成结构化导读：\n\n${corpus}` }
+      ]);
 
-    const parsed = parseStrictJson<SummaryAiPayload>(aiRaw);
-    const summary = String(parsed.summary ?? "")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, MAX_SUMMARY_CHARS);
+      const parsed = parseStrictJson<SummaryAiPayload>(aiRaw);
+      const summary = String(parsed.summary ?? "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, MAX_SUMMARY_CHARS);
 
-    if (!summary) {
-      throw new HttpError(502, "AI 返回的摘要为空，请重试。");
+      if (!summary) {
+        throw new HttpError(502, "AI 返回的摘要为空，请重试。");
+      }
+
+      const result: PaperSummaryResult = {
+        summary,
+        keyPoints: normalizeStringList(parsed.keyPoints, KEY_POINT_RANGE, "核心观点"),
+        contributions: normalizeStringList(parsed.contributions, CONTRIBUTION_RANGE, "研究贡献")
+      };
+
+      await persistSummary(paperId, result);
+      return result;
+    } catch (error) {
+      // 失败后状态绝不能停在 "generating"：前端的 pollPaperSummary 会一直等
+      // 一个永远不会到来的完成信号，把「正在生成...」显示到用户手动刷新为止。
+      // 先落 failed，调用方（解析链路的 fire-and-forget）可以再覆盖成更具体的信息。
+      const message = error instanceof Error ? error.message : "unknown error";
+      await prisma.paper.update({
+        where: { id: paperId },
+        data: { summaryStatus: "failed", summaryError: message.slice(0, 1000) }
+      }).catch(() => {});
+      throw error;
     }
-
-    const result: PaperSummaryResult = {
-      summary,
-      keyPoints: normalizeStringList(parsed.keyPoints, KEY_POINT_RANGE, "核心观点"),
-      contributions: normalizeStringList(parsed.contributions, CONTRIBUTION_RANGE, "研究贡献")
-    };
-
-    await persistSummary(paperId, result);
-    return result;
   }
 
   private toResult(summary: string | null, keyPoints: string | null, contributions: string | null): PaperSummaryResult {
