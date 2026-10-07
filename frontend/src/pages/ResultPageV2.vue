@@ -33,6 +33,54 @@
       </div>
     </div>
 
+    <!-- 结构化摘要：解析完成后由后端异步生成，失败时如实提示，不用占位内容兜底 -->
+    <div v-if="summaryData.summary" class="summary-card">
+      <div class="summary-head">
+        <h3>📋 结构化摘要</h3>
+        <button class="summary-retry" :disabled="summaryGenerating" @click="regenerateSummary">
+          {{ summaryGenerating ? '生成中...' : '↻ 重新生成' }}
+        </button>
+      </div>
+      <div class="summary-body markdown-body" v-html="renderMarkdown(summaryData.summary)"></div>
+      <div class="summary-cols">
+        <div v-if="summaryData.keyPoints.length" class="summary-col">
+          <h4>💡 核心观点</h4>
+          <ul>
+            <li v-for="(point, index) in summaryData.keyPoints" :key="'kp-' + index">{{ point }}</li>
+          </ul>
+        </div>
+        <div v-if="summaryData.contributions.length" class="summary-col">
+          <h4>🎯 研究贡献</h4>
+          <ul>
+            <li v-for="(item, index) in summaryData.contributions" :key="'ct-' + index">{{ item }}</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div v-else-if="summaryData.status === 'failed'" class="summary-card summary-card--failed">
+      <span class="summary-failed-text">⚠️ 结构化摘要生成失败：{{ summaryData.error || '未知原因' }}</span>
+      <button class="summary-retry" :disabled="summaryGenerating" @click="regenerateSummary">
+        {{ summaryGenerating ? '重试中...' : '重试' }}
+      </button>
+    </div>
+
+    <!-- 摘要还没生成：解析期间不显示，解析完成后给一个明确的生成入口 -->
+    <div v-else-if="store.sections.length > 0" class="summary-card summary-card--pending">
+      <div class="summary-pending">
+        <template v-if="summaryData.status === 'generating'">
+          <div class="loading-spinner loading-spinner--light"></div>
+          <p>📋 正在生成结构化摘要，大概需要 30 秒...</p>
+        </template>
+        <template v-else>
+          <p>📋 这篇论文还没有结构化摘要。生成后可以先看研究问题、方法与主要结论，再逐节精读。</p>
+        </template>
+      </div>
+      <button v-if="summaryData.status !== 'generating'" class="summary-retry" :disabled="summaryGenerating" @click="regenerateSummary">
+        {{ summaryGenerating ? '生成中...' : '✨ 生成摘要' }}
+      </button>
+    </div>
+
     <!-- 主内容区：左右分栏 -->
     <div class="main-layout">
       <!-- 左侧：章节树 -->
@@ -238,7 +286,7 @@ import { ref, computed, onMounted, nextTick } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { createMarkdownRenderer } from '../utils/markdown';
 import { usePaperDetailStore } from '../stores/paperDetailStore';
-import { getPaperDetail, getPaperNonTextItems, startStudySession, sendStudyMessage } from '../services/paperApiV2';
+import { getPaperDetail, getPaperNonTextItems, startStudySession, sendStudyMessage, regeneratePaperSummary } from '../services/paperApiV2';
 
 const router = useRouter();
 const route = useRoute();
@@ -283,6 +331,54 @@ const followUps = ref({});
 const localNonTextItems = ref([]);
 
 const paper = computed(() => store.paper);
+
+// 结构化摘要：解析完成后由后端异步生成。摘要失败不影响章节阅读，
+// 所以这里只如实显示状态，不用任何占位内容兜底。
+const summaryGenerating = ref(false);
+
+const parseSummaryList = (raw) => {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.map((item) => String(item)).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+};
+
+const summaryData = computed(() => {
+  const source = store.paper || {};
+  return {
+    summary: String(source.summary || '').trim(),
+    keyPoints: parseSummaryList(source.keyPoints),
+    contributions: parseSummaryList(source.contributions),
+    status: String(source.summaryStatus || '').trim(),
+    error: String(source.summaryError || '').trim()
+  };
+});
+
+const regenerateSummary = async () => {
+  if (!store.paperId || summaryGenerating.value) return;
+
+  summaryGenerating.value = true;
+  try {
+    const response = await regeneratePaperSummary(store.paperId);
+    const payload = response.summary || {};
+    store.paper = {
+      ...store.paper,
+      summary: payload.summary,
+      keyPoints: JSON.stringify(payload.keyPoints || []),
+      contributions: JSON.stringify(payload.contributions || []),
+      summaryStatus: 'done',
+      summaryError: null
+    };
+  } catch (error) {
+    store.errorMessage = error?.response?.data?.message || error?.message || '结构化摘要生成失败';
+  } finally {
+    summaryGenerating.value = false;
+  }
+};
+
 const totalParagraphCount = computed(() => {
   return store.sections.reduce((total, section) => total + (section.paragraphs?.length || 0), 0);
 });
@@ -793,10 +889,14 @@ const pollPaperStatus = async (paperId, maxAttempts = 60) => {
         pollStatus.value = 'done';
         // 加载完整数据
         await store.loadPaper(paperId);
+        isPolling.value = false;
+        // 摘要在解析完成之后才异步跑，不能等它，但要在它出来时把页面补上
+        pollPaperSummary(paperId);
         return true;
       } else if (rawContent.status === 'failed') {
         pollStatus.value = 'failed';
         pollError.value = rawContent.error || '解析失败';
+        isPolling.value = false;
         return false;
       }
       
@@ -819,7 +919,33 @@ const pollPaperStatus = async (paperId, maxAttempts = 60) => {
   
   pollStatus.value = 'failed';
   pollError.value = '解析超时，请稍后刷新页面';
+  isPolling.value = false;
   return false;
+};
+
+// 摘要生成慢于解析（要读全文调一次 LLM），所以在解析轮询结束后单独轮询它。
+// 超时就不等了——用户点「重新生成」随时可以再试，没必要让页面一直转圈。
+const pollPaperSummary = async (paperId, maxAttempts = 24) => {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const response = await getPaperDetail(paperId);
+      const paper = response.paper || {};
+      const status = String(paper.summaryStatus || '').trim();
+
+      if (status === 'done' && paper.summary) {
+        store.paper = { ...store.paper, ...paper };
+        return;
+      }
+      if (status === 'failed') {
+        store.paper = { ...store.paper, ...paper };
+        return;
+      }
+    } catch (error) {
+      console.error('[ResultPageV2] 摘要轮询失败:', error);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+  }
 };
 
 const loadLocalNonTextItems = async (paperId) => {
@@ -2113,6 +2239,170 @@ onMounted(async () => {
   .original-panel,
   .explanation-panel {
     max-height: none;
+  }
+}
+
+/* ===== 结构化摘要 ===== */
+.summary-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-left: 4px solid #667eea;
+}
+
+.summary-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.summary-head h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.summary-retry {
+  padding: 6px 14px;
+  font-size: 13px;
+  color: #667eea;
+  background: rgba(102, 126, 234, 0.1);
+  border: 1px solid rgba(102, 126, 234, 0.3);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.summary-retry:hover:not(:disabled) {
+  background: #667eea;
+  color: white;
+}
+
+.summary-retry:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.summary-body {
+  font-size: 14px;
+  line-height: 1.8;
+  color: #444;
+}
+
+.summary-body p {
+  margin: 0 0 10px;
+}
+
+.summary-body h1,
+.summary-body h2,
+.summary-body h3 {
+  font-size: 15px;
+  color: #333;
+  margin: 14px 0 8px;
+}
+
+.summary-body strong {
+  color: #333;
+}
+
+.summary-body ul,
+.summary-body ol {
+  margin: 0 0 10px;
+  padding-left: 22px;
+}
+
+.summary-body li {
+  margin-bottom: 4px;
+}
+
+.summary-body code {
+  background: #f0f2f5;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.summary-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #eee;
+}
+
+.summary-col h4 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: #333;
+}
+
+.summary-col ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.summary-col li {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #555;
+  margin-bottom: 8px;
+}
+
+.summary-card--failed {
+  border-left-color: #e64a4a;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+
+.summary-failed-text {
+  font-size: 13px;
+  color: #e64a4a;
+}
+
+.summary-card--pending {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  border-left-color: #f0c419;
+}
+
+.summary-pending {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.summary-pending p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #666;
+}
+
+.loading-spinner--light {
+  width: 22px;
+  height: 22px;
+  border-width: 3px;
+  flex-shrink: 0;
+  border-color: rgba(102, 126, 234, 0.25);
+  border-top-color: #667eea;
+}
+
+@media (max-width: 768px) {
+  .summary-cols {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-card--failed {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style>

@@ -17,6 +17,13 @@ model Paper {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  // 结构化摘要：解析完成后由 LLM 异步生成，失败不影响解析主链路
+  summary       String? // 中文 Markdown 摘要
+  keyPoints     String? // JSON 字符串数组：核心观点
+  contributions String? // JSON 字符串数组：研究贡献
+  summaryStatus String? // pending | generating | done | failed
+  summaryError  String?
+
   sections Section[]
 }
 

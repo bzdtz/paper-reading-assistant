@@ -42,6 +42,14 @@ export const getPaperDetail = async (paperId) => {
 };
 
 /**
+ * 重新生成结构化摘要（摘要 / 核心观点 / 研究贡献）
+ */
+export const regeneratePaperSummary = async (paperId) => {
+  const response = await http.post(`/api/v2/papers/${paperId}/summary/regenerate`);
+  return response.data;
+};
+
+/**
  * 获取论文本地非文字内容（图片等）
  */
 export const getPaperNonTextItems = async (paperId) => {

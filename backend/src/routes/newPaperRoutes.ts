@@ -16,6 +16,7 @@ import { HttpError } from '../utils/errors.js';
 import { env } from '../config/env.js';
 import { readRuntimeSettings, updateRuntimeSettings } from '../config/runtimeSettings.js';
 import { loadZAIConfig, resetZAIConfigCache } from '../config/zaiConfig.js';
+import { paperSummaryGenerator } from '../services/paperSummaryGenerator.js';
 
 // 创建主路由器
 const router = express.Router();
@@ -1923,6 +1924,53 @@ paperRouter.get('/follow-up/:parentId', async (req, res, next) => {
 });
 
 /**
+ * 生成结构化摘要，把失败原因落库而不是往外抛。
+ * 解析主链路不 await 它，所以这里必须自己吞掉异常——否则一个未捕获的
+ * rejection 会把整个解析进程的报错语义搞乱。
+ */
+async function generatePaperSummary(paperId: string) {
+  try {
+    await paperSummaryGenerator.generate(paperId);
+    console.log(`[MinerUParse] 论文 ${paperId} 结构化摘要生成完成`);
+  } catch (error: any) {
+    const message = error instanceof Error ? error.message : 'unknown error';
+    await prisma.paper.update({
+      where: { id: paperId },
+      data: { summaryStatus: 'failed', summaryError: message.slice(0, 1000) }
+    }).catch(() => {});
+  }
+}
+
+/**
+ * 重新生成结构化摘要（同步返回，前端按钮带 loading）
+ * POST /api/v2/papers/:id/summary/regenerate
+ */
+paperRouter.post('/:id/summary/regenerate', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const paper = await prisma.paper.findUnique({
+      where: { id },
+      include: { sections: { select: { id: true } } }
+    });
+
+    if (!paper) {
+      throw new HttpError(404, '论文不存在');
+    }
+
+    if (paper.sections.length === 0) {
+      throw new HttpError(400, '论文尚未解析完成，暂时无法生成摘要');
+    }
+
+    const result = await paperSummaryGenerator.generate(id, true);
+
+    res.json({ success: true, summary: result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * 异步解析论文（后台任务）- 核心逻辑：智能归属 + 图片处理
  */
 async function parsePaperWithMinerU(paperId: string, filePath: string) {
@@ -2149,6 +2197,14 @@ async function parsePaperWithMinerU(paperId: string, filePath: string) {
     });
 
     console.log(`[MinerUParse] 论文 ${paperId} 解析并入库成功！`);
+
+    // 5. 结构化摘要：解析完成后异步生成。
+    // 故意不 await——用户拿到章节就能开始读了，摘要不该挡在"能看论文"前面。
+    // 摘要失败只把 summaryStatus 置为 failed，不回滚已入库的章节。
+    generatePaperSummary(paperId).catch((error) => {
+      console.error(`[MinerUParse] 结构化摘要任务异常 (paper: ${paperId}):`, error);
+    });
+
     
     // 清理临时文件
     try { await fs.promises.unlink(filePath); } catch {}
