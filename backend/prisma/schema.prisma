@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// 论文表
+model Paper {
+  id           String   @id @default(uuid())
+  fileName     String
+  fileType     String // pdf, docx, doc, txt, md
+  mineruTaskId String? // MinerU 任务ID
+  rawContent   String // MinerU 提取的原始内容（JSON字符串）
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sections Section[]
+}
+
+// 章节表
+model Section {
+  id      String @id @default(uuid())
+  paperId String
+  paper   Paper  @relation(fields: [paperId], references: [id], onDelete: Cascade)
+  title   String // 章节标题，如 "1. Introduction"
+  order   Int // 章节顺序
+
+  paragraphs Paragraph[]
+
+  @@index([paperId])
+}
+
+// 段落表
+model Paragraph {
+  id           String  @id @default(uuid())
+  sectionId    String
+  section      Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  originalText String // 原文内容（SQLite 无 TEXT 类型限制）
+  translation  String? // 机器翻译（中文）
+  order        Int // 段落顺序
+
+  translations Translation[]
+  explanations Explanation[]
+  messageRefs  MessageParagraphRef[]
+
+  @@index([sectionId])
+}
+
+// 翻译缓存表
+model Translation {
+  id          String    @id @default(uuid())
+  paragraphId String
+  paragraph   Paragraph @relation(fields: [paragraphId], references: [id], onDelete: Cascade)
+  content     String // 翻译内容
+
+  followUps FollowUpQuestion[]
+
+  @@index([paragraphId])
+}
+
+// 讲解缓存表
+model Explanation {
+  id          String    @id @default(uuid())
+  paragraphId String
+  paragraph   Paragraph @relation(fields: [paragraphId], references: [id], onDelete: Cascade)
+  content     String // 讲解内容（Markdown）
+
+  followUps FollowUpQuestion[]
+
+  @@index([paragraphId])
+}
+
+// 追问记录表
+model FollowUpQuestion {
+  id            String       @id @default(uuid())
+  parentId      String // 关联的翻译或讲解 ID
+  parentType    String // "TRANSLATION" | "EXPLANATION"
+  question      String // 用户的问题
+  answer        String // AI 的回答
+  createdAt     DateTime     @default(now())
+  Translation   Translation? @relation(fields: [translationId], references: [id])
+  translationId String?
+  Explanation   Explanation? @relation(fields: [explanationId], references: [id])
+  explanationId String?
+
+  @@index([parentId])
+}
+
+// 保留旧的分析记录表（向后兼容）
+model AnalysisRecord {
+  id             Int      @id @default(autoincrement())
+  sourceType     String
+  fileName       String?
+  contentChars   Int
+  extractedChars Int?
+  sectionsJson   String
+  createdAt      DateTime @default(now())
+}
+
+// 对话会话表
+model ChatSession {
+  id        String   @id @default(uuid())
+  paperId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages ChatMessage[]
+
+  @@index([paperId])
+}
+
+// 对话消息表
+model ChatMessage {
+  id        String   @id @default(uuid())
+  sessionId String
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role      String   // "user" | "assistant"
+  content   String   // 消息内容
+  createdAt DateTime @default(now())
+
+  // AI 回答涉及的段落
+  paragraphs MessageParagraphRef[]
+
+  @@index([sessionId])
+}
+
+// 消息-段落关联表
+model MessageParagraphRef {
+  id          String   @id @default(uuid())
+  messageId   String
+  message     ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  paragraphId String
+  paragraph   Paragraph @relation(fields: [paragraphId], references: [id])
+  order       Int // 展示顺序
+
+  @@index([messageId])
+  @@index([paragraphId])
+}

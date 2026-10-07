@@ -1,0 +1,11 @@
+{
+  "baseUrl": "https://your-z-ai-endpoint.example.com",
+  "apiKey": "your_api_key",
+  "chatId": "optional_chat_id",
+  "userId": "optional_user_id",
+  "token": "optional_token",
+  "model": "glm-4.5-air",
+  "requestTimeoutMs": 90000,
+  "maxRetries": 1,
+  "retryDelayMs": 1200
+}

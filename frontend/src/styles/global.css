@@ -1,0 +1,384 @@
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=ZCOOL+XiaoWei&display=swap");
+
+:root {
+  --bg-1: #f3ebd8;
+  --bg-2: #e3edf7;
+  --ink-1: #193a5d;
+  --ink-2: #4b6077;
+  --surface-1: rgba(255, 255, 255, 0.92);
+  --surface-2: #ffffff;
+  --surface-3: #f8fafc;
+  --line-1: #cbd5e0;
+  --line-2: #e2e8f0;
+  --line-3: #edf2f7;
+  --accent: #3182ce;
+  --accent-strong: #2c5282;
+  --accent-soft: #ebf8ff;
+  --danger-soft: #fed7d7;
+  --warn-soft: #fffaf0;
+  --shadow-soft: 0 8px 24px rgba(15, 23, 42, 0.1);
+  --grid-line: rgba(20, 51, 84, 0.04);
+}
+
+:root[data-theme="dark"] {
+  --bg-1: #0b1220;
+  --bg-2: #111f34;
+  --ink-1: #e5edf9;
+  --ink-2: #a5b4ca;
+  --surface-1: rgba(15, 23, 42, 0.86);
+  --surface-2: #0f172a;
+  --surface-3: #111c31;
+  --line-1: rgba(148, 163, 184, 0.45);
+  --line-2: rgba(148, 163, 184, 0.33);
+  --line-3: rgba(148, 163, 184, 0.24);
+  --accent: #60a5fa;
+  --accent-strong: #3b82f6;
+  --accent-soft: rgba(59, 130, 246, 0.2);
+  --danger-soft: rgba(239, 68, 68, 0.2);
+  --warn-soft: rgba(245, 158, 11, 0.18);
+  --shadow-soft: 0 16px 36px rgba(2, 6, 23, 0.42);
+  --grid-line: rgba(148, 163, 184, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--ink-1);
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(211, 128, 20, 0.26) 0, rgba(211, 128, 20, 0) 34%),
+    radial-gradient(circle at 83% 22%, rgba(46, 122, 176, 0.19) 0, rgba(46, 122, 176, 0) 38%),
+    linear-gradient(150deg, var(--bg-1), var(--bg-2));
+  transition: background 0.25s ease, color 0.2s ease;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0.35;
+  z-index: -1;
+}
+
+body[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+body[data-theme="dark"]::before {
+  opacity: 0.28;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: "ZCOOL XiaoWei", "Noto Serif SC", serif;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+.container {
+  width: min(1200px, 92vw);
+  margin: 0 auto;
+}
+
+.markdown-body {
+  color: #1f3552;
+  line-height: 1.82;
+  word-break: break-word;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4 {
+  margin: 18px 0 10px;
+  color: #173f68;
+}
+
+.markdown-body p {
+  margin: 10px 0;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  margin: 10px 0;
+  padding-left: 20px;
+}
+
+.markdown-body blockquote {
+  margin: 12px 0;
+  padding: 8px 12px;
+  border-left: 4px solid rgba(214, 128, 23, 0.7);
+  background: rgba(255, 240, 214, 0.42);
+}
+
+.markdown-body code {
+  background: rgba(15, 48, 82, 0.08);
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+
+.markdown-body pre {
+  margin: 12px 0;
+  background: rgba(13, 40, 71, 0.9);
+  color: #ebf1fa;
+  border-radius: 10px;
+  padding: 12px;
+  overflow-x: auto;
+}
+
+.markdown-body pre code {
+  background: none;
+  padding: 0;
+}
+
+body[data-theme="dark"] .upload-v2-page,
+body[data-theme="dark"] .chat-page,
+body[data-theme="dark"] .result-page-v2 {
+  color: var(--ink-1);
+}
+
+body[data-theme="dark"] :where(
+  .upload-card,
+  .drop-zone,
+  .top-bar,
+  .chat-header,
+  .sidebar,
+  .sidebar-header,
+  .section-title-row,
+  .section-paragraphs,
+  .media-rail,
+  .media-stage,
+  .media-stage-meta,
+  .media-chat-panel,
+  .media-chat-body,
+  .messages-container,
+  .assistant-bubble,
+  .paragraph-card,
+  .card-summary,
+  .triad-block,
+  .input-area,
+  .original-panel,
+  .explanation-panel,
+  .outline-node,
+  .outline-header,
+  .section-children,
+  .paragraph-item,
+  .source-preview,
+  .source-block,
+  .original-text,
+  .translated-block,
+  .figure-card,
+  .media-card,
+  .media-card-body,
+  .dialog-body,
+  .chat-row.assistant .chat-bubble,
+  .followup-chat,
+  .message.answer,
+  .accordion-item,
+  .accordion-header,
+  .accordion-body,
+  .result-content,
+  .media-modal-meta,
+  .question-chip,
+  .loading-banner,
+  .mind-node
+) {
+  background: var(--surface-1) !important;
+  border-color: var(--line-2) !important;
+}
+
+body[data-theme="dark"] :where(
+  .upload-v2-page .hero h1,
+  .paper-title,
+  .panel-title,
+  .section-title,
+  .section-name,
+  .media-stage-title,
+  .media-rail-head,
+  .source-preview-head h3,
+  .dialog-header h3,
+  .meta h2,
+  .figure-title,
+  .media-title,
+  .source-text,
+  .translation-text,
+  .explanation-text,
+  .message-content,
+  .en-line,
+  .media-modal-title,
+  .mind-node-title
+) {
+  color: var(--ink-1) !important;
+}
+
+body[data-theme="dark"] :where(
+  .desc,
+  .tree-meta,
+  .para-text,
+  .source-block-title,
+  .figure-hint,
+  .figure-explain,
+  .media-explain,
+  .para-preview,
+  .input-hint,
+  .progress-text,
+  .upload-prompt .sub-title,
+  .file-info .file-size,
+  .section-count,
+  .para-count,
+  .placeholder-text,
+  .zh-line,
+  .triad-title,
+  .progress-chip,
+  .media-stage-desc,
+  .source-section,
+  .source-order,
+  .count-badge,
+  .expand-icon,
+  .para-label,
+  .loading-indicator,
+  .media-modal-desc,
+  .mind-node-meta,
+  .mind-branch,
+  .mind-more
+) {
+  color: var(--ink-2) !important;
+}
+
+body[data-theme="dark"] :where(
+  .action-btn,
+  .back-btn,
+  .secondary-btn,
+  .question-chip,
+  .para-btn,
+  .followup-send-btn,
+  .followup-input-field,
+  .dialog-input,
+  .message-input,
+  .media-chat-input,
+  .media-nav-btn,
+  .inline-action-btn,
+  .translate-btn,
+  .toggle-btn,
+  .outline-mode-btn
+) {
+  background: rgba(30, 41, 59, 0.78) !important;
+  border-color: var(--line-1) !important;
+  color: var(--ink-1) !important;
+}
+
+body[data-theme="dark"] :where(
+  .primary-btn,
+  .action-btn.primary,
+  .send-btn,
+  .followup-send-btn,
+  .media-chat-send-btn,
+  .followup-send-btn,
+  .para-btn.primary,
+  .chat-row.user .chat-bubble,
+  .user-bubble
+) {
+  background: linear-gradient(135deg, #2b6cb0, #2c5282) !important;
+  border-color: transparent !important;
+  color: #f8fbff !important;
+}
+
+body[data-theme="dark"] :where(
+  .drop-zone:hover,
+  .drop-zone.is-dragging,
+  .back-btn:hover,
+  .action-btn:hover:not(:disabled),
+  .question-chip:hover,
+  .para-btn:hover:not(:disabled),
+  .section-title-row:hover,
+  .paragraph-item:hover,
+  .accordion-header:hover,
+  .toggle-btn.active,
+  .media-chat-row.assistant .media-chat-bubble,
+  .followup-toggle:hover
+) {
+  background: rgba(51, 65, 85, 0.72) !important;
+  border-color: rgba(148, 163, 184, 0.56) !important;
+}
+
+body[data-theme="dark"] :where(
+  input,
+  textarea
+) {
+  background: rgba(15, 23, 42, 0.72) !important;
+  border-color: var(--line-1) !important;
+  color: var(--ink-1) !important;
+}
+
+body[data-theme="dark"] :where(input::placeholder, textarea::placeholder) {
+  color: #90a4be;
+}
+
+body[data-theme="dark"] :where(input:focus, textarea:focus) {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+}
+
+body[data-theme="dark"] .markdown-body {
+  color: #d8e2ef;
+}
+
+body[data-theme="dark"] .markdown-body h1,
+body[data-theme="dark"] .markdown-body h2,
+body[data-theme="dark"] .markdown-body h3,
+body[data-theme="dark"] .markdown-body h4 {
+  color: #f0f6ff;
+}
+
+body[data-theme="dark"] .markdown-body blockquote {
+  border-left-color: rgba(96, 165, 250, 0.8);
+  background: rgba(30, 58, 95, 0.36);
+}
+
+body[data-theme="dark"] .markdown-body code {
+  background: rgba(148, 163, 184, 0.2);
+}
+
+body[data-theme="dark"] .markdown-body pre {
+  background: #0b1220;
+  color: #e2ebf7;
+}
+
+body[data-theme="dark"] .markdown-body .katex,
+body[data-theme="dark"] .markdown-body .katex-display {
+  color: #f8fbff;
+}
+
+body[data-theme="dark"] .media-chat-row.assistant .media-chat-bubble {
+  background: rgba(30, 41, 59, 0.92) !important;
+  border: 1px solid rgba(148, 163, 184, 0.4) !important;
+  color: #e7eef9 !important;
+}
+
+body[data-theme="dark"] .media-chat-row.assistant .media-chat-bubble .markdown-body {
+  color: #e7eef9 !important;
+}
+
+body[data-theme="dark"] .line-group th,
+body[data-theme="dark"] .line-group td {
+  border-color: var(--line-2);
+}
+
+body[data-theme="dark"] .line-group th {
+  background: rgba(30, 41, 59, 0.82);
+}
